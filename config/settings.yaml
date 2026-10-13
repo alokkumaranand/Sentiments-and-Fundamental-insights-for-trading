@@ -1,0 +1,95 @@
+# =============================================================================
+#  THE ONE PLACE TO CHANGE WHICH DATASET RUNS
+# =============================================================================
+#  `datasets.active` picks one entry out of `datasets.sources` below.
+#
+#    dev   -> splits/*_validation.csv   the small 1:9 slice, earliest 10% of dates.
+#             FAST and safe to experiment on, but it holds only 26 trading
+#             sessions and 8,079 tweets, so it is for CORRECTNESS testing only.
+#             No statistical conclusion can be drawn from it.
+#    full  -> the original files. Required for any real EDA (Phases 2-4).
+#
+#  To switch:  edit `active:` below, or pass  --dataset full  on the command line.
+#              (the CLI flag wins for that one run and changes nothing on disk)
+#
+#  Paths are relative to the repository root. To point at a completely different
+#  dataset, add another entry under `sources:` and set `active:` to its name --
+#  no code changes are needed.
+datasets:
+  active: dev
+  sources:
+    dev:
+      tweets: splits/tweets_validation.csv   # plain CSV, written by split_datasets.py
+      prices: splits/prices_validation.csv
+      tweets_member: null                    # not a zip, so no member to name
+    full:
+      tweets: stock_tweets.csv.zip           # ZIP; the loader reads the member below in memory
+      prices: stock_yfinance_data.csv
+      tweets_member: stock_tweets.csv
+    # Example of a third source, left here as a template:
+    # train:
+    #   tweets: splits/tweets_train.csv
+    #   prices: splits/prices_train.csv
+    #   tweets_member: null
+
+# Market clock and the session-alignment rule (SPEC.md 4.2).
+market:
+  timezone: America/New_York   # session boundary is expressed in this zone
+  close_hour: 16               # a tweet before 16:00 ET belongs to that session
+
+# Column names expected in the raw inputs. Changing these is how you adapt the
+# pipeline to a differently-named dataset without touching any code.
+columns:
+  tweets:
+    date: Date
+    text: Tweet
+    ticker: Stock Name
+    company: Company Name
+  prices:
+    date: Date
+    ticker: Stock Name
+    close: Close
+    adj_close: "Adj Close"
+    volume: Volume
+
+# Where generated artifacts go. Override per run with --outdir if you like.
+paths:
+  artifacts: artifacts/runs
+  quality_report: docs/quality_report.md
+  # Convenience "latest" copy of the new-data report, written by `run.py append`.
+  append_report: docs/append_report.md
+
+# -----------------------------------------------------------------------------
+#  LLM wiring (Phase 1+). Secrets come from .env, never from this file.
+#  The *_env keys name the environment variable that holds each value.
+# -----------------------------------------------------------------------------
+llm:
+  provider: openai_compatible      # the only transport implemented in v0
+  enabled_env: EDA_LLM_ENABLED
+  base_url_env: EDA_LLM_BASE_URL
+  api_key_env: EDA_LLM_API_KEY
+  model_env: EDA_LLM_MODEL
+  timeout_env: EDA_LLM_TIMEOUT_S
+  tool_calling: auto               # auto | native | json_prompt
+  temperature: 0
+  max_tokens: 2000
+  cache: true                      # cache responses by prompt hash; a repeat run costs nothing
+  cache_dir: artifacts/llm_cache
+
+agents:
+  # max_tokens for the induction call: a proposal of up to 60 terms is a long JSON document, and a
+  # 2000-token cap truncates it mid-object. The client salvages a truncated answer, but the honest
+  # fix is to give the call enough room to finish.
+  induction: {per_ticker: 60, max_total: 1500, min_support: 10, sign_agreement: 0.6, max_tokens: 8000}
+  explorer:  {max_tool_calls: 12, retries_on_schema_error: 1}
+  presenter: {max_findings: 8}
+
+sentiment:
+  # vader_plus_lexicon needs `vaderSentiment` (installed from requirements.txt).
+  # If it is missing the scorer falls back to lexicon_only, so no run ever fails
+  # because of a missing optional dependency.
+  method: vader_plus_lexicon       # vader_plus_lexicon | lexicon_only
+  label_band: 0.05                 # VADER's conventional +/- band
+  # CREATED IN PHASE 1, not present yet. It is the shipped no-key lexicon, so the pipeline
+  # never depends on the LLM being reachable. Referenced here so its location is fixed early.
+  lexicon: config/lexicons/default_v1.json

@@ -1,0 +1,90 @@
+# Experiment surface: every window, threshold and horizon lives here and nowhere else.
+# Values marked (P0) are consumed now; the rest are consumed by the phase named in the comment.
+
+# =============================================================================
+#  MANUAL DATASET SCOPE -- the knob to change when you want to work with a subset
+# =============================================================================
+#  Which tickers this run considers. Applied BEFORE any metric is computed, in the
+#  profiler and in every later stage, so reported counts always describe the data
+#  actually in use rather than the file on disk.
+#
+#    include: null            -> every ticker (default)
+#    include: [TSLA, TSM, NIO] -> only these
+#    exclude: [AMZN, MSFT, PG, F, NOC] -> everything except the 100% cross-posted tickers
+#
+#  Both may be combined; exclude wins. Excluding tickers can trip the "at least two
+#  tier-A tickers" blocking check, which is intended: a one-ticker profile is not a
+#  comparison and the run should say so rather than quietly produce one.
+scope:
+  include: null
+  exclude: []
+
+# --- profiling / data quality (P0) -------------------------------------------
+quality:
+  # A ticker-day below this many tweets has too little text for a sentiment score to mean
+  # anything, so it is excluded from sentiment tests and reported as an excluded count.
+  # 3 is taken from the measured distribution (36% of ticker-days carry <3 tweets).
+  # Change it freely; nothing downstream hard-codes it.
+  min_tweets_per_day: 3
+  promo_min_cashtags: 4        # a tweet with >=4 cashtags counts as promo-shaped
+  split_return_limit: 0.50     # (P0) fail if any |1-day return| >= this: catches an unadjusted split
+  max_uncovered_token_share: 0.15   # (P5) re-induction trigger when the frozen lexicon drifts
+
+# --- coverage tiers (P0) -----------------------------------------------------
+# Own-text share = fraction of a ticker's tweets whose text appears under no other ticker.
+# Measured on the full corpus: TSM .99, TSLA .93, NIO .85 | ... | AMZN/MSFT/PG/F/NOC 0.00
+tiers:
+  specific_own_text_share: 0.80   # >= -> tier A, unrestricted per-ticker inference
+  mixed_own_text_share: 0.10      # >= -> tier B, per-ticker needs own_text_only; else tier C
+
+# --- chronological discovery / holdout split (P2) ----------------------------
+# A session FRACTION, never a date literal, so it stays correct if the window changes.
+split:
+  discovery_fraction: 0.70
+
+# --- feature windows (P2) ----------------------------------------------------
+attention:
+  baseline_sessions: 20        # trailing window for the robust z-score (past-only, shifted)
+  spike_z: 3.0
+  sustained_sessions: 2
+price:
+  realized_vol_windows: [5, 20]
+  horizons: [1, 2, 5]          # forward-return horizons, in sessions
+  return_basis: adj_close      # verified reliable: prices are already split-adjusted
+
+# --- text scoring modifiers (P2) ---------------------------------------------
+sentiment:
+  # A negator ("not good") flips a term and damps it, because "not good" is weaker than
+  # "bad". 3 tokens = the conventional short-range negation scope; 0.75 = damp factor.
+  negation_window: 3
+  negation_damp: 0.75
+  lexicon_weight: 0.5          # final polarity = (1-w)*VADER + w*lexicon, both in [-1,1]
+  exclude_promo: false         # promo rows are kept but their share is always reported
+                               # (the drift threshold lives once, in quality.max_uncovered_token_share)
+  # Own-text restriction per coverage tier. OFF for tier A on purpose: a tier-A ticker's shared
+  # text is genuine market chatter about it, and dropping it would remove real signal. ON for
+  # tiers B and C, where shared text is the generic pool rather than the company.
+  own_text_only: {tier_a: false, tier_b: true, tier_c: true}
+
+# --- feature induction gate (P1) ---------------------------------------------
+induction:
+  # The sample and the validation slice are separated by SESSION PARITY, not randomly and
+  # not chronologically: parity gives both slices the whole window, so a term cannot pass
+  # or fail merely because it appears only late in the year.
+  validation_parity: 1
+  strata_caps: {promo: 0.20, reply: 0.10, cashtag_dense: 0.20}
+  bootstrap_resamples: 1000
+  bootstrap_block_sessions: 5
+
+# --- inference (P3) ---------------------------------------------------------
+bootstrap:
+  block_sessions: 5            # one trading week; h>1 forward returns overlap, so IID is wrong
+  resamples: 2000
+  seed: 20260912
+multiple_testing:
+  alpha: 0.05
+  method: benjamini_hochberg
+tools:
+  table_row_cap: 50            # ToolResult.table is capped so an agent cannot paste a dataset
+charts:
+  default_backend: png         # png | ascii ; "ascii <n>" is always available in the menu

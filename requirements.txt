@@ -1,0 +1,16 @@
+# Pinned to the versions verified working on this machine (Phase 0, 2026-09-12).
+# Install with:  .venv\Scripts\python.exe -m pip install -r requirements.txt
+# The LLM transport is the standard library (urllib), so no vendor SDK is listed here.
+
+pandas==2.3.3
+numpy==2.2.6
+scipy==1.16.2          # block bootstrap, Spearman, BH adjustment (used from Phase 2 on)
+pydantic==2.13.4       # ToolResult / Finding / LexiconProposal schemas
+PyYAML==6.0.3          # config/settings.yaml, config/experiments.yaml
+python-dotenv==1.2.2   # reads .env for the LLM endpoint (Phase 1)
+rich==13.9.4           # terminal overview, summary, chart menu
+matplotlib==3.10.5     # chart rendering to PNG (Phase 3)
+
+# Sentiment + tests. vaderSentiment is offline and deterministic; it needs no key and no network.
+vaderSentiment==3.3.2
+pytest==8.4.2

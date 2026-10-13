@@ -1,0 +1,21 @@
+# Local-only artifacts. Nothing here is needed to reproduce a run from the raw inputs.
+.venv/
+.env
+
+# Generated run outputs (never commit; a run is reproduced from the raw inputs + config)
+artifacts/runs/
+artifacts/llm_cache/
+artifacts/lexicons/
+# The panel cache is a rebuildable optimisation, keyed by a fingerprint of the inputs and config.
+artifacts/cache/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.tmp-tests/
+*.egg-info/
+
+# OS
+Thumbs.db
+desktop.ini

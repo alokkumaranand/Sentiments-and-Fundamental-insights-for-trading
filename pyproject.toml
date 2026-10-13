@@ -1,0 +1,19 @@
+# Minimal project metadata. There is deliberately no build step and no install step:
+# the tool is run from the repository root as
+#   .venv\Scripts\python.exe run.py <command>
+# run.py puts src/ on sys.path, which is why no editable install is needed.
+
+[project]
+name = "agentic-eda-demo"
+version = "0.1.0"
+description = "Stock tweets + prices -> agent-induced features -> deterministic EDA -> terminal insights"
+requires-python = ">=3.11"
+
+# pytest gets src/ on the path from the setting below; tests also run under
+# `python -m unittest discover -s tests` with no extra tooling.
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+# -p no:cacheprovider: the cache writes through the platform temp directory, which this
+# environment allows creating but not deleting, producing noisy warnings on every run.
+addopts = "-q -p no:cacheprovider"

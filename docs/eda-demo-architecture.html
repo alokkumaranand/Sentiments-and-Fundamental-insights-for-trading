@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agentic EDA Demo — High-Level System Design</title>
+<style>
+  :root{
+    --ink:#16181d; --ink-2:#414855; --ink-3:#6b7280; --line:#dfe3ea;
+    --bg:#ffffff; --bg-2:#f6f8fb; --bg-3:#eef2f7;
+    --accent:#1f5fa8; --warn:#a15c00; --warn-bg:#fff8ec;
+    --ok:#1c6b46; --ok-bg:#f0f9f4; --llm:#5b3fa8; --llm-bg:#f5f2fd;
+    --radius:10px; --mono:ui-monospace,"Cascadia Code","SF Mono",Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans);
+    font-size:16px; line-height:1.65; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1180px; margin:0 auto; padding:0 28px 96px}
+  a{color:var(--accent)}
+
+  /* ---------- masthead ---------- */
+  header.mast{
+    background:linear-gradient(150deg,#101418 0%, #1b2634 55%, #23405c 100%);
+    color:#eef2f7; padding:52px 0 44px; border-bottom:3px solid var(--accent);
+  }
+  header.mast .wrap{padding-bottom:0}
+  .kicker{font-size:12px; letter-spacing:.18em; text-transform:uppercase; color:#8fb4dc; margin:0 0 14px}
+  h1{font-size:40px; line-height:1.15; margin:0 0 12px; font-weight:650; letter-spacing:-.02em}
+  .sub{margin:0; color:#b9c6d6; font-size:17px; max-width:70ch}
+  .meta{margin-top:22px; font-size:13px; color:#8fa3b8; font-family:var(--mono)}
+  .meta span{display:inline-block; margin-right:18px}
+
+  /* ---------- layout ---------- */
+  .cols{display:grid; grid-template-columns:238px 1fr; gap:44px; align-items:start; margin-top:40px}
+  nav.toc{position:sticky; top:24px; font-size:13.5px; border-left:2px solid var(--line); padding-left:16px}
+  nav.toc h4{margin:0 0 10px; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-3)}
+  nav.toc a{display:block; color:var(--ink-2); text-decoration:none; padding:3px 0}
+  nav.toc a:hover{color:var(--accent)}
+  nav.toc a b{color:var(--ink-3); font-weight:600; font-family:var(--mono); font-size:11.5px; margin-right:7px}
+
+  /* ---------- typography ---------- */
+  h2{
+    font-size:25px; margin:56px 0 6px; letter-spacing:-.01em; font-weight:640;
+    padding-bottom:8px; border-bottom:1px solid var(--line);
+  }
+  h2:first-of-type{margin-top:8px}
+  h2 .num{font-family:var(--mono); font-size:14px; color:var(--accent); margin-right:10px; font-weight:600}
+  h3{font-size:17px; margin:30px 0 8px; font-weight:640}
+  h4{font-size:14.5px; margin:22px 0 6px; font-weight:650}
+  p{margin:10px 0}
+  ul,ol{margin:10px 0; padding-left:22px}
+  li{margin:4px 0}
+  code{font-family:var(--mono); font-size:.88em; background:var(--bg-3); padding:1px 5px; border-radius:4px; color:#243447}
+  .lede{font-size:17px; color:var(--ink-2); border-left:3px solid var(--accent); padding:2px 0 2px 16px; margin:16px 0 4px}
+
+  /* ---------- boxes ---------- */
+  .box{border:1px solid var(--line); background:var(--bg-2); border-radius:var(--radius); padding:16px 20px; margin:18px 0}
+  .box.accent{border-left:4px solid var(--accent)}
+  .box.warn{background:var(--warn-bg); border-color:#f0dcbb; border-left:4px solid var(--warn)}
+  .box.ok{background:var(--ok-bg); border-color:#c9e6d7; border-left:4px solid var(--ok)}
+  .box .tag{font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-3); font-weight:700}
+
+  /* ---------- tables ---------- */
+  table{border-collapse:collapse; width:100%; margin:16px 0; font-size:14px}
+  th,td{text-align:left; padding:9px 12px; border-bottom:1px solid var(--line); vertical-align:top}
+  th{background:var(--bg-3); font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-2); font-weight:700}
+  tbody tr:hover{background:#fafbfd}
+  td.mono,th.mono{font-family:var(--mono); font-size:12.5px}
+  .small{font-size:13px; color:var(--ink-3)}
+
+  /* ---------- architecture diagram ---------- */
+  .diagram{border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; margin:22px 0}
+  .layer{display:grid; grid-template-columns:132px 1fr; border-bottom:1px solid var(--line)}
+  .layer:last-child{border-bottom:none}
+  .layer .lname{
+    background:var(--bg-3); padding:14px 12px; font-size:11.5px; font-weight:700;
+    letter-spacing:.09em; text-transform:uppercase; color:var(--ink-2); border-right:1px solid var(--line);
+    display:flex; align-items:center;
+  }
+  .layer .lbody{padding:12px 14px; display:flex; flex-wrap:wrap; gap:8px; align-items:center}
+  .chip{
+    border:1px solid var(--line); background:#fff; border-radius:7px; padding:7px 11px;
+    font-size:13px; line-height:1.35; box-shadow:0 1px 0 rgba(16,24,40,.03);
+  }
+  .chip b{display:block; font-size:13px; font-weight:640}
+  .chip span{font-size:11.5px; color:var(--ink-3)}
+  .chip.mono{font-family:var(--mono); font-size:12px}
+  .chip.llm{border-color:#cfc3ee; background:var(--llm-bg)}
+  .chip.data{border-color:#cfe0f2; background:#f4f9ff}
+  .chip.art{border-color:#e2e0d0; background:#fdfcf5}
+  .chip.no{background:#f7f8fa; color:var(--ink-2)}
+  .flow{display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:18px 0; font-size:13px}
+  .flow .step{border:1px solid var(--line); background:#fff; border-radius:6px; padding:6px 10px; font-family:var(--mono); font-size:12px}
+  .flow .arrow{color:var(--ink-3)}
+
+  /* ---------- component cards ---------- */
+  .cards{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin:18px 0}
+  .card{border:1px solid var(--line); border-radius:var(--radius); padding:16px 18px; background:#fff}
+  .card.llm{border-color:#d8cdf3; background:linear-gradient(180deg,#faf8ff,#fff)}
+  .card header{display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin-bottom:6px}
+  .card .cid{font-family:var(--mono); font-size:11.5px; color:var(--accent); font-weight:700; letter-spacing:.05em}
+  .card h4{margin:0; font-size:15.5px}
+  .card p{margin:6px 0; font-size:14.2px; color:var(--ink-2)}
+  .card dl{margin:10px 0 0; font-size:12.8px; display:grid; grid-template-columns:92px 1fr; gap:4px 10px}
+  .card dt{color:var(--ink-3); font-weight:650; text-transform:uppercase; letter-spacing:.05em; font-size:10.5px; padding-top:2px}
+  .card dd{margin:0; font-family:var(--mono); font-size:12px; color:#2b3646; word-break:break-word}
+  .pill{display:inline-block; font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; font-weight:700; padding:2px 8px; border-radius:20px; border:1px solid var(--line); color:var(--ink-3); background:var(--bg-2); white-space:nowrap}
+  .pill.llm{color:var(--llm); border-color:#d0c4ee; background:var(--llm-bg)}
+  .pill.pure{color:var(--ok); border-color:#c2e0d1; background:var(--ok-bg)}
+
+  footer{margin-top:70px; padding-top:20px; border-top:1px solid var(--line); font-size:13px; color:var(--ink-3)}
+  @media (max-width:900px){
+    .cols{grid-template-columns:1fr; gap:0} nav.toc{position:static; border-left:none; padding-left:0; margin-bottom:10px}
+    .cards{grid-template-columns:1fr} h1{font-size:30px} .layer{grid-template-columns:1fr}
+    .layer .lname{border-right:none; border-bottom:1px solid var(--line)}
+  }
+  @media print{
+    body{font-size:11pt} nav.toc{display:none} .cols{grid-template-columns:1fr}
+    header.mast{background:#111; -webkit-print-color-adjust:exact} h2{page-break-after:avoid} .card{page-break-inside:avoid}
+  }
+</style>
+</head>
+<body>
+
+<header class="mast">
+  <div class="wrap">
+    <p class="kicker">High-Level System Design</p>
+    <h1>Agentic EDA Demo</h1>
+    <p class="sub">Stock tweets + daily prices in, a checked exploratory analysis out. One idea decides every
+    boundary in this design: <strong>code computes and judges; the model chooses and explains.</strong></p>
+    <p class="meta">
+      <span>as-built · 19 components · 5 layers</span>
+      <span>Python 3.13 · pandas · pydantic</span>
+      <span>LLM layers optional</span>
+    </p>
+  </div>
+</header>
+
+<div class="wrap">
+<div class="cols">
+
+<nav class="toc">
+  <h4>Contents</h4>
+  <a href="#s1"><b>1</b>Requirements</a>
+  <a href="#s2"><b>2</b>The mental model</a>
+  <a href="#s3"><b>3</b>Architecture at a glance</a>
+  <a href="#s4"><b>4</b>Component catalog</a>
+  <a href="#s5"><b>5</b>Request lifecycle</a>
+  <a href="#s6"><b>6</b>Data &amp; storage model</a>
+  <a href="#s7"><b>7</b>Dependencies</a>
+  <a href="#s8"><b>8</b>Invariants &amp; trust boundaries</a>
+  <a href="#s9"><b>9</b>Failure modes</a>
+  <a href="#s10"><b>10</b>Configuration surface</a>
+  <a href="#s11"><b>11</b>Extension points</a>
+  <a href="#s12"><b>12</b>Known limits</a>
+</nav>
+
+<main>
+
+<!-- ===================== 1 ===================== -->
+<h2 id="s1"><span class="num">1</span>Requirements</h2>
+<p class="lede">An offline-friendly, single-machine pipeline that turns an arbitrary
+tweets + prices pair into an honest report — and that can prove where every number came from.</p>
+
+<table>
+  <thead><tr><th style="width:22%">Driver</th><th>What it forces in the design</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Trustworthy numbers</strong></td><td>Every figure in prose must trace to a computation with an id. A verification stage sits between generation and publication.</td></tr>
+    <tr><td><strong>Corpus is dirty and cross-posted</strong></td><td>Attention is measured on <em>ticker-specific</em> text, not row counts. Coverage tiers exist because five tickers are 100% reposted.</td></tr>
+    <tr><td><strong>Claims must not be over-read</strong></td><td>Testing, multiplicity correction and holdout replication are enforced by code, never requested from a model.</td></tr>
+    <tr><td><strong>Must run with no API key</strong></td><td>The whole analysis path is deterministic; the model is an optional overlay with a templated fallback at every seam.</td></tr>
+    <tr><td><strong>Cheap to re-run</strong></td><td>The expensive stage (feature panel) is cached behind a config-and-input fingerprint.</td></tr>
+    <tr><td><strong>Analyst changes, not code changes</strong></td><td>Windows, thresholds, dataset choice, even column names live in two YAML files.</td></tr>
+  </tbody>
+</table>
+
+<div class="box warn">
+  <span class="tag">Non-goals</span>
+  <p style="margin-bottom:0">Not a trading system, not a backtest, no execution or position sizing, no web UI,
+  no distributed compute, no streaming. Single process, single machine, batch runs.</p>
+</div>
+
+<!-- ===================== 2 ===================== -->
+<h2 id="s2"><span class="num">2</span>The mental model</h2>
+<p>Three planes, and the separation between them <em>is</em> the architecture:</p>
+<ol>
+  <li><strong>The deterministic plane</strong> — ingestion, cleaning, features, statistics, status assignment.
+  Pure functions over a table. Reproducible, unit-tested, no network.</li>
+  <li><strong>The orchestration plane</strong> — one coordinator that sequences stages, owns the tool budget,
+  decides when the holdout is read, and writes the manifest. Deliberately <em>not</em> an LLM.</li>
+  <li><strong>The model plane</strong> — three narrow LLM roles: propose a vocabulary, pick follow-up
+  questions, write prose. Every one of them can degrade to a deterministic fallback without failing the run.</li>
+</ol>
+<p>An agent never scores a row, never sees the full dataset, never chooses which period to read, and never
+decides whether a result is "supported". Those four prohibitions explain almost every interface below.</p>
+
+<!-- ===================== 3 ===================== -->
+<h2 id="s3"><span class="num">3</span>Architecture at a glance</h2>
+<p>Read the stack top-down: user surfaces, then the coordinator, then the optional model plane,
+then the deterministic analysis plane, and finally the data plane it all rests on.</p>
+
+<div class="diagram">
+  <div class="layer">
+    <div class="lname">Surfaces</div>
+    <div class="lbody">
+      <div class="chip"><b>CLI dispatcher</b><span>run.py → argparse, 8 subcommands</span></div>
+      <div class="chip"><b>Terminal output</b><span>rich console, run summary, findings</span></div>
+      <div class="chip"><b>Report renderers</b><span>report.md · report.html · findings.json</span></div>
+      <div class="chip"><b>Chart menu</b><span>PNG figures, ASCII fallback</span></div>
+    </div>
+  </div>
+  <div class="layer">
+    <div class="lname">Orchestration</div>
+    <div class="lbody">
+      <div class="chip"><b>Coordinator — <code>pipeline.py</code></b><span>stages, tool budget, holdout trigger, manifest</span></div>
+    </div>
+  </div>
+  <div class="layer">
+    <div class="lname">Model plane<br><span style="font-weight:400;text-transform:none;letter-spacing:0">optional</span></div>
+    <div class="lbody">
+      <div class="chip llm"><b>LLM gateway</b><span>OpenAI-compatible, cache, JSON repair</span></div>
+      <div class="chip llm"><b>Induction agent</b><span>proposes sentiment terms</span></div>
+      <div class="chip llm"><b>Explorer agent</b><span>≤12 follow-up tool calls</span></div>
+      <div class="chip llm"><b>Presenter agent</b><span>prose, then re-checked</span></div>
+      <div class="chip no"><b>Null agent</b><span>templated fallback, no key</span></div>
+    </div>
+  </div>
+  <div class="layer">
+    <div class="lname">Analysis</div>
+    <div class="lbody">
+      <div class="chip"><b>Tool registry</b><span>per-run catalog + result store</span></div>
+      <div class="chip"><b>14 typed tools</b><span>descriptive · relational · validation</span></div>
+      <div class="chip"><b>Playbook</b><span>fixed baseline call list</span></div>
+      <div class="chip"><b>Inference kernel</b><span>block bootstrap · BH · robust z</span></div>
+      <div class="chip"><b>Status rules</b><span>pure function → 4 statuses</span></div>
+      <div class="chip"><b>Claim checker</b><span>numbers vs tool results</span></div>
+    </div>
+  </div>
+  <div class="layer">
+    <div class="lname">Data</div>
+    <div class="lbody">
+      <div class="chip data"><b>Raw adapters</b><span>CSV / ZIP member in memory</span></div>
+      <div class="chip data"><b>Validator &amp; profiler</b><span>blocking checks, tiers</span></div>
+      <div class="chip data"><b>Canonicalizer</b><span>clean · scope · session align</span></div>
+      <div class="chip data"><b>Panel builder</b><span>ticker-session features</span></div>
+      <div class="chip data"><b>Lexicon store</b><span>shipped / induced, frozen</span></div>
+      <div class="chip art"><b>Artifact store</b><span>runs · cache · lexicons · llm_cache</span></div>
+    </div>
+  </div>
+  <div class="layer">
+    <div class="lname">Sources</div>
+    <div class="lbody">
+      <div class="chip mono">stock_tweets.csv.zip</div>
+      <div class="chip mono">stock_yfinance_data.csv</div>
+      <div class="chip mono">config/settings.yaml</div>
+      <div class="chip mono">config/experiments.yaml</div>
+      <div class="chip mono">.env</div>
+    </div>
+  </div>
+</div>
+
+<h3>The run, as a pipeline</h3>
+<div class="flow">
+  <span class="step">profile / tiers</span><span class="arrow">→</span>
+  <span class="step">lexicon resolve</span><span class="arrow">→</span>
+  <span class="step">induce (LLM?)</span><span class="arrow">→</span>
+  <span class="step">panel + cache</span><span class="arrow">→</span>
+  <span class="step">playbook (14 calls)</span><span class="arrow">→</span>
+  <span class="step">explorer (LLM?)</span><span class="arrow">→</span>
+  <span class="step">holdout + BH</span><span class="arrow">→</span>
+  <span class="step">status + claim check</span><span class="arrow">→</span>
+  <span class="step">presenter (LLM?)</span><span class="arrow">→</span>
+  <span class="step">report + manifest</span>
+</div>
+<p class="small">Everything left of “explorer” also runs in <code>playbook</code> mode with no endpoint at all.
+The purple components are the only ones that ever touch the network.</p>
+
+<!-- ===================== 4 ===================== -->
+<h2 id="s4"><span class="num">4</span>Component catalog</h2>
+<p class="small">Nineteen components, grouped by plane. Each card names its job, its seam, and what it
+depends on — the dependency lines are the design.</p>
+
+<h3>4.1 Surfaces</h3>
+<div class="cards">
+
+  <div class="card">
+    <header><div><span class="cid">C1</span><h4>Entry point &amp; CLI</h4></div><span class="pill pure">deterministic</span></header>
+    <p>Puts <code>src/</code> on the import path (the project is never pip-installed), then parses one subcommand
+    and dispatches. Every command accepts <code>--dataset</code>; lazy imports let <code>doctor</code> report a
+    missing library instead of crashing on the import that would have detected it.</p>
+    <dl>
+      <dt>Interface</dt><dd>run.py &lt;command&gt; [flags]</dd>
+      <dt>Depends on</dt><dd>config plane, every stage entry point</dd>
+      <dt>Used by</dt><dd>the human, nothing else</dd>
+      <dt>Fails by</dt><dd>exit code 1/2 + named problem</dd>
+    </dl>
+  </div>
+
+  <div class="card">
+    <header><div><span class="cid">C2</span><h4>Configuration plane</h4></div><span class="pill pure">deterministic</span></header>
+    <p>Loads both YAML files and <code>.env</code> into one frozen <code>Settings</code> object, resolves every
+    path against the repo root, and applies precedence <em>process env → .env → settings.yaml</em>. An unknown
+    dataset name is fatal rather than a silent fallback to the wrong data.</p>
+    <dl>
+      <dt>Interface</dt><dd>Settings (frozen dataclass)</dd>
+      <dt>Depends on</dt><dd>settings.yaml, experiments.yaml, .env</dd>
+      <dt>Used by</dt><dd>all 18 other components</dd>
+      <dt>Fails by</dt><dd>SystemExit naming the missing file/key</dd>
+    </dl>
+  </div>
+
+  <div class="card">
+    <header><div><span class="cid">C18</span><h4>Reporting &amp; chart layer</h4></div><span class="pill pure">deterministic</span></header>
+    <p>Renders one <code>RunState</code> into Markdown, a self-contained HTML file, a results JSON and PNG
+    figures. The terminal overview and the numbered chart menu are the interactive surface; ASCII rendering
+    exists as the fallback when the console cannot encode block characters.</p>
+    <dl>
+      <dt>Interface</dt><dd>RunState → report.md/html, figures/</dd>
+      <dt>Depends on</dt><dd>RunState, ToolResults, ChartSpecs</dd>
+      <dt>Used by</dt><dd>CLI (<code>run</code>, <code>playbook</code>, <code>charts</code>)</dd>
+      <dt>Fails by</dt><dd>falls back to ASCII / temp-file figure viewer</dd>
+    </dl>
+  </div>
+
+</div>
+
+<h3>4.2 Orchestration</h3>
+<div class="cards">
+
+  <div class="card">
+    <header><div><span class="cid">C14</span><h4>Coordinator</h4></div><span class="pill pure">deterministic</span></header>
+    <p>The only component that knows the order of things. It creates the run id and directory, sequences the
+    stages, caps holdout re-checks at <code>MAX_HOLDOUT_CHECKS = 8</code>, assigns every status, and writes the
+    manifest. It owns the two decisions an agent most wants: which period is read, and what counts as supported.</p>
+    <dl>
+      <dt>Interface</dt><dd>run_pipeline(settings, mode) → RunState</dd>
+      <dt>Depends on</dt><dd>every plane below it (composition root)</dd>
+      <dt>Used by</dt><dd>CLI commands <code>playbook</code> and <code>run</code></dd>
+      <dt>Fails by</dt><dd>propagates only blocking data errors</dd>
+    </dl>
+  </div>
+
+  <div class="card">
+    <header><div><span class="cid">C13</span><h4>Baseline playbook</h4></div><span class="pill pure">deterministic</span></header>
+    <p>A fixed, readable call list of 14 analyses — the "guaranteed report before any model is involved".
+    It encodes three rules: every pooled result is run with and without TSLA, sentiment vs forward returns is
+    asked at all three horizons, and attention is tested against <em>next-day</em> absolute return. A failing
+    call is recorded and skipped, never fatal.</p>
+    <dl>
+      <dt>Interface</dt><dd>playbook_calls() → [(tool, params, period)]</dd>
+      <dt>Depends on</dt><dd>C11 tool registry</dd>
+      <dt>Used by</dt><dd>C14 coordinator (both modes)</dd>
+      <dt>Fails by</dt><dd>records skip reason; report says so</dd>
+    </dl>
+  </div>
+
+</div>
+
+<h3>4.3 Model plane <span class="small">— optional, isolated, replaceable</span></h3>
+<div class="cards">
+
+  <div class="card llm">
+    <header><div><span class="cid">C8</span><h4>LLM gateway</h4></div><span class="pill llm">model</span></header>
+    <p>The single outbound door. A standard-library HTTP client for any OpenAI-compatible endpoint (no vendor
+    SDK), with three transport modes (<code>auto | native | json_prompt</code>), a prompt-hash response cache,
+    JSON extraction with truncation salvage, and a per-run call log that lands in the manifest. If no endpoint is
+    configured it simply reports itself unavailable.</p>
+    <dl>
+      <dt>Interface</dt><dd>LLMClient.available · complete() · ping() · calls</dd>
+      <dt>Depends on</dt><dd>.env, network, artifacts/llm_cache</dd>
+      <dt>Used by</dt><dd>C9 induction, C15 explorer, C17 presenter</dd>
+      <dt>Fails by</dt><dd>raises LLMError; callers degrade</dd>
+    </dl>
+  </div>
+
+  <div class="card llm">
+    <header><div><span class="cid">C9</span><h4>Induction agent</h4></div><span class="pill llm">model</span></header>
+    <p>Asks the model for a sentiment vocabulary, then a <em>deterministic gate</em> accepts or rejects each
+    term: minimum support, sign agreement with surrounding text, bootstrap stability, and a session-parity
+    validation slice so no term passes merely for appearing late in the year. Only accepted terms are frozen.</p>
+    <dl>
+      <dt>Interface</dt><dd>run_induction() → InductionResult(accepted, rejected)</dd>
+      <dt>Depends on</dt><dd>C8 gateway, C6 canonical data, strata sampler</dd>
+      <dt>Used by</dt><dd>C14 (only when no frozen lexicon exists)</dd>
+      <dt>Fails by</dt><dd>keeps the shipped lexicon; run continues</dd>
+    </dl>
+  </div>
+
+  <div class="card llm">
+    <header><div><span class="cid">C15</span><h4>Explorer agent</h4></div><span class="pill llm">model</span></header>
+    <p>Reads the playbook digest and asks up to 12 follow-up questions by calling the same typed tools — never
+    inventing a number. It can only see the <strong>discovery</strong> period; the holdout is physically
+    unreachable from its input. Draft findings are schema-validated before they go anywhere.</p>
+    <dl>
+      <dt>Interface</dt><dd>run_explorer() → ExplorerOutcome(drafts)</dd>
+      <dt>Depends on</dt><dd>C8 gateway, C11 registry (discovery only)</dd>
+      <dt>Used by</dt><dd>C14 coordinator (full mode only)</dd>
+      <dt>Fails by</dt><dd>returns no drafts; playbook findings stand</dd>
+    </dl>
+  </div>
+
+  <div class="card llm">
+    <header><div><span class="cid">C17</span><h4>Presenter agent + null agent</h4></div><span class="pill llm">model</span></header>
+    <p>Turns verified findings into prose with citations, capped at <code>max_findings</code>. Every number it
+    writes is re-checked arithmetically afterwards. The null agent is its twin without a model: the same
+    structure, filled from templates, which is what makes a no-key run a first-class citizen.</p>
+    <dl>
+      <dt>Interface</dt><dd>run_presenter() → Narrative · template_narrative()</dd>
+      <dt>Depends on</dt><dd>C8 gateway, C16 findings + allowed-number set</dd>
+      <dt>Used by</dt><dd>C14 (final stage)</dd>
+      <dt>Fails by</dt><dd>falls back to the templated narrative</dd>
+    </dl>
+  </div>
+
+</div>
+
+<h3>4.4 Analysis plane <span class="small">— deterministic, the source of every number</span></h3>
+<div class="cards">
+
+  <div class="card">
+    <header><div><span class="cid">C11</span><h4>Tool registry &amp; typed tools</h4></div><span class="pill pure">deterministic</span></header>
+    <p>Fourteen pure analyses — coverage, distributions, time series, text stats, sample tweets, correlation,
+    bucketed forward returns, correlation matrix, spike days, attention vs price, holdout check, p-value
+    adjustment — each with a pydantic parameter schema and a uniform <code>ToolResult</code> (stats, table,
+    chart, caveats, <code>n_units</code>, <code>result_id</code>). The catalog is a fixed list, so a model cannot
+    extend what can be called. The registry is rebuilt per run so one run's results can never be cited as
+    another's evidence.</p>
+    <dl>
+      <dt>Interface</dt><dd>registry.call(tool, params, period)</dd>
+      <dt>Depends on</dt><dd>panel, tweets, tiers, settings, C12 inference</dd>
+      <dt>Used by</dt><dd>C13 playbook, C15 explorer, C14 coordinator</dd>
+      <dt>Fails by</dt><dd>ToolError → recorded, never fatal</dd>
+    </dl>
+  </div>
+
+  <div class="card">
+    <header><div><span class="cid">C12</span><h4>Inference kernel</h4></div><span class="pill pure">deterministic</span></header>
+    <p>Five small statistics with one opinion baked in: because a single news day is counted many times,
+    the resampling unit is the <em>session block</em>, not the row. Provides Spearman with p-value, block
+    bootstrap confidence intervals, a bootstrap p-value for bucket spreads, Benjamini–Hochberg q-values, and a
+    robust median/MAD z-score for attention spikes.</p>
+    <dl>
+      <dt>Interface</dt><dd>spearman · block_bootstrap · benjamini_hochberg · robust_z</dd>
+      <dt>Depends on</dt><dd>numpy, scipy, bootstrap config</dd>
+      <dt>Used by</dt><dd>C11 tools</dd>
+      <dt>Fails by</dt><dd>returns NaN/null rather than a fabricated figure</dd>
+    </dl>
+  </div>
+
+  <div class="card">
+    <header><div><span class="cid">C16</span><h4>Findings, status rules &amp; claim checker</h4></div><span class="pill pure">deterministic</span></header>
+    <p>A pure function turns tested numbers into exactly four statuses — <code>observed</code>,
+    <code>supported</code>, <code>not_replicated</code>, <code>inconclusive</code> — with two structural
+    overrides: a tier-C ticker can never exceed <code>observed</code>, and a tier-B per-ticker claim is capped
+    unless its text was restricted to own text. The claim checker then scans the prose for numbers and rejects
+    any that does not match a value in a cited tool result.</p>
+    <dl>
+      <dt>Interface</dt><dd>assign_status() · check_draft() → Verdict</dd>
+      <dt>Depends on</dt><dd>ToolResult set, tier map, alpha</dd>
+      <dt>Used by</dt><dd>C14 coordinator, C17 presenter</dd>
+      <dt>Fails by</dt><dd>unmatched number → claim stripped/flagged</dd>
+    </dl>
+  </div>
+
+</div>
+
+<h3>4.5 Data plane <span class="small">— the expensive, cached part</span></h3>
+<div class="cards">
+
+  <div class="card">
+    <header><div><span class="cid">C3</span><h4>Raw input adapters</h4></div><span class="pill pure">deterministic</span></header>
+    <p>Reads a plain CSV or a member inside a ZIP entirely in memory, with <code>utf-8-sig</code> so a BOM is
+    harmless, and computes a SHA-256 for every input. Inputs are opened read-only and are never rewritten by
+    any stage.</p>
+    <dl>
+      <dt>Interface</dt><dd>read_raw_csv(path, member) → (frame, hash)</dd>
+      <dt>Depends on</dt><dd>dataset source entry in settings.yaml</dd>
+      <dt>Used by</dt><dd>C4 validator, C5 profiler, C6 canonicalizer</dd>
+      <dt>Fails by</dt><dd>BlockingError with file + column named</dd>
+    </dl>
+  </div>
+
+  <div class="card">
+    <header><div><span class="cid">C4</span><h4>Data contract validator</h4></div><span class="pill pure">deterministic</span></header>
+    <p>The gate that stops a run on bad inputs: required columns present, dates parseable, tickers overlapping
+    between the two files, at least some own text, and at least two tier-A tickers. This is the one place where
+    failing loudly is the correct behaviour.</p>
+    <dl>
+      <dt>Interface</dt><dd>require_columns · require_ticker_overlap · require_tier_a</dd>
+      <dt>Depends on</dt><dd>C3 frames, column map</dd>
+      <dt>Used by</dt><dd>C5 profiler, C6 canonicalizer</dd>
+      <dt>Fails by</dt><dd>raises BlockingError</dd>
+    </dl>
+  </div>
+
+  <div class="card">
+    <header><div><span class="cid">C5</span><h4>Profiler &amp; coverage tiering</h4></div><span class="pill pure">deterministic</span></header>
+    <p>Read-only census of the dataset: text and promo statistics, price continuity (a 1-day move above the
+    split limit is treated as an unadjusted split), and the per-ticker own-text share that assigns tiers A/B/C.
+    Writes the quality report and, critically, the <code>data_version</code> hash that everything downstream is
+    keyed to.</p>
+    <dl>
+      <dt>Interface</dt><dd>build_profile() → dict · assign_tiers()</dd>
+      <dt>Depends on</dt><dd>C3, C4, quality thresholds</dd>
+      <dt>Used by</dt><dd>CLI <code>profile</code>, C10 panel cache key</dd>
+      <dt>Fails by</dt><dd>blocking check → run refused</dd>
+    </dl>
+  </div>
+
+  <div class="card">
+    <header><div><span class="cid">C6</span><h4>Canonicalizer &amp; session aligner</h4></div><span class="pill pure">deterministic</span></header>
+    <p>Turns raw text into a canonical table: clean text, marker lists, promo/reply flags, ticker scope filter,
+    cross-post fan-out flags, and session alignment against the market calendar — a tweet before the 16:00 ET
+    close belongs to that session. It also cuts the chronological 70/30 discovery/holdout split by session
+    fraction, never by date literal.</p>
+    <dl>
+      <dt>Interface</dt><dd>build_canonical() → Canonical</dd>
+      <dt>Depends on</dt><dd>C3, C4, C5, market clock settings, scope config</dd>
+      <dt>Used by</dt><dd>C9 induction, C10 panel builder</dd>
+      <dt>Fails by</dt><dd>warnings list; blocks only on contract errors</dd>
+    </dl>
+  </div>
+
+  <div class="card">
+    <header><div><span class="cid">C7</span><h4>Lexicon store &amp; resolver</h4></div><span class="pill pure">deterministic</span></header>
+    <p>Holds a frozen sentiment vocabulary as a versioned pydantic object with a content-derived
+    <code>lexicon_id</code>. Resolution order: an active induced lexicon, else the shipped
+    <code>default_v1.json</code>. Freezing is the point — the vocabulary a report used can be named exactly.</p>
+    <dl>
+      <dt>Interface</dt><dd>resolve_lexicon() → (FrozenLexicon, provenance)</dd>
+      <dt>Depends on</dt><dd>config/lexicons, artifacts/lexicons/active.json</dd>
+      <dt>Used by</dt><dd>C9 induction, C10 panel builder, C14</dd>
+      <dt>Fails by</dt><dd>falls back to shipped lexicon</dd>
+    </dl>
+  </div>
+
+  <div class="card">
+    <header><div><span class="cid">C10</span><h4>Panel builder &amp; cache</h4></div><span class="pill pure">deterministic</span></header>
+    <p>Aggregates everything to one row per <strong>ticker-session</strong>: the seven sentiment measures
+    (lexicon blended with VADER, negation-aware) and the seven attention measures (A1–A7, with an attention
+    z-score built from a past-only trailing baseline), plus price features and forward returns. Applies the
+    coverage gates and emits an explicit excluded count. Sits behind a cache keyed on input hashes, both config
+    files, the lexicon id and the code version — a cache hit is provably the same computation, not a stale copy.</p>
+    <dl>
+      <dt>Interface</dt><dd>get_panel() → Panel(panel, tweets, tiers, data_version)</dd>
+      <dt>Depends on</dt><dd>C6 canonical, C7 lexicon, panel cache</dd>
+      <dt>Used by</dt><dd>C11 registry, C14, feature book</dd>
+      <dt>Fails by</dt><dd>cache miss/mismatch → rebuild</dd>
+    </dl>
+  </div>
+
+  <div class="card">
+    <header><div><span class="cid">C19</span><h4>Append path</h4></div><span class="pill pure">deterministic</span></header>
+    <p>The new-data path: ingest arriving tweets append-only and report vocabulary drift (the share of tokens
+    the frozen lexicon does not cover) as a signal that re-induction is due. No model call at all — drift is
+    measured, not judged.</p>
+    <dl>
+      <dt>Interface</dt><dd>append_tweets() → AppendResult</dd>
+      <dt>Depends on</dt><dd>C6, C7, C10, drift threshold</dd>
+      <dt>Used by</dt><dd>CLI <code>append</code></dd>
+      <dt>Fails by</dt><dd>reports drift over threshold</dd>
+    </dl>
+  </div>
+
+</div>
+
+<!-- ===================== 5 ===================== -->
+<h2 id="s5"><span class="num">5</span>Request lifecycle</h2>
+<p>What happens on <code>run.py --dataset full run</code>, in order. The steps that can involve a model are marked.</p>
+
+<ol>
+  <li><strong>Configure.</strong> YAML + <code>.env</code> resolve into <code>Settings</code>; the CLI flag overrides the active dataset for this run only.</li>
+  <li><strong>Resolve the vocabulary.</strong> If an induced lexicon is already frozen, use it and skip induction — re-inducing every run would make numbers depend on a fresh, meaningless model call.</li>
+  <li><strong>Induce <span class="pill llm">model</span></strong> (only if needed and a key exists). Sample strata → model proposes terms → deterministic gate accepts/rejects each → freeze and write an active pointer.</li>
+  <li><strong>Build or load the panel.</strong> Cache fingerprint matches → load; otherwise clean, align, score, aggregate, save.</li>
+  <li><strong>Build the registry.</strong> One per run, carrying that run's panel, tiers and data version.</li>
+  <li><strong>Run the playbook.</strong> 14 fixed calls; failures are recorded, not raised.</li>
+  <li><strong>Explore <span class="pill llm">model</span></strong> (full mode). The agent sees a trimmed digest plus discovery-period access, and issues ≤12 tool calls. Every call returns a stored <code>ToolResult</code>.</li>
+  <li><strong>Verify.</strong> The coordinator re-runs each tested discovery result on the holdout (capped at 8) and applies Benjamini–Hochberg across all tests.</li>
+  <li><strong>Judge.</strong> Status rules assign one of four statuses; tier overrides applied. No model is consulted.</li>
+  <li><strong>Write prose <span class="pill llm">model</span></strong> (full mode). The presenter drafts the narrative citing result ids; the claim checker then verifies every number against its cited result.</li>
+  <li><strong>Publish.</strong> Report, findings, results, manifest and figures are written to the run directory; the terminal shows the summary and the chart menu.</li>
+</ol>
+
+<div class="box ok">
+  <span class="tag">Why this shape</span>
+  <p style="margin-bottom:0">Steps 8 and 9 sit <em>between</em> generation and publication. That ordering is the
+  whole safety story: a claim cannot reach the reader without passing through code that knows the ground truth.</p>
+</div>
+
+<!-- ===================== 6 ===================== -->
+<h2 id="s6"><span class="num">6</span>Data &amp; storage model</h2>
+<p>Two things are stored: an immutable tree of inputs and config that everything is keyed to, and an append-only
+collection of run directories. Stages communicate <em>through files and typed objects</em>, never by mutating
+each other's state.</p>
+
+<table>
+  <thead><tr><th style="width:26%">Location</th><th>Contents</th><th style="width:18%">Mutability</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">stock_tweets.csv.zip<br>stock_yfinance_data.csv</td><td>Raw source data. ZIP is read in memory; nothing is extracted to disk.</td><td>read-only, always</td></tr>
+    <tr><td class="mono">config/</td><td>Dataset sources &amp; column map, experiment parameters, shipped lexicon.</td><td>human-edited</td></tr>
+    <tr><td class="mono">artifacts/runs/&lt;id&gt;/</td><td><code>report.md</code>, <code>report.html</code>, <code>findings.json</code>, <code>results/results.json</code>, <code>manifest.json</code>, <code>figures/</code>, rejected proposals.</td><td>append-only</td></tr>
+    <tr><td class="mono">artifacts/cache/</td><td>The panel, written under its <code>data_version</code>. A mismatch never loads.</td><td>derived, disposable</td></tr>
+    <tr><td class="mono">artifacts/lexicons/</td><td>Frozen induced vocabularies + the pointer to the active one.</td><td>append-only</td></tr>
+    <tr><td class="mono">artifacts/llm_cache/</td><td>Model responses keyed by prompt hash, so a repeated run costs nothing.</td><td>derived, disposable</td></tr>
+    <tr><td class="mono">docs/</td><td>Quality report, feature book, progress notes, decision records.</td><td>regenerated</td></tr>
+  </tbody>
+</table>
+
+<h4>The one key worth understanding: <code>data_version</code></h4>
+<p>A hash over the input file digests, both config files, the lexicon id and the code version. It appears in every
+tool result's caveats and in the manifest. Two consequences: a cache hit is trustworthy rather than merely
+convenient, and any metric change can be attributed to a specific change in data or configuration.</p>
+
+<!-- ===================== 7 ===================== -->
+<h2 id="s7"><span class="num">7</span>Dependencies</h2>
+
+<h3>7.1 Component dependency rules</h3>
+<p>Layering is enforced by direction of imports. Four rules carry most of the weight:</p>
+<ol>
+  <li><strong>Analysis never depends on the model plane.</strong> Every tool is a pure function of the panel and
+  validated parameters; that is exactly why the playbook can run with no endpoint and why a holdout re-run is
+  possible at all — the same call with the same parameters, one period over.</li>
+  <li><strong>The model plane depends on analysis, never the reverse.</strong> Agents call tools; tools have no
+  reference to agents. The catalog is a fixed list, so the callable surface cannot grow at runtime.</li>
+  <li><strong>The coordinator is a composition root.</strong> Data flows down, decisions flow up. No stage
+  sequences another stage.</li>
+  <li><strong>Configuration and the inference kernel are leaves.</strong> They are imported widely and import
+  nothing from the pipeline.</li>
+</ol>
+
+<table>
+  <thead><tr><th style="width:24%">Component</th><th style="width:34%">Directly depends on</th><th>Consumed by</th></tr></thead>
+  <tbody>
+    <tr><td>C1 CLI</td><td>C2</td><td>human / shell</td></tr>
+    <tr><td>C2 Configuration</td><td>YAML files, .env</td><td>everything</td></tr>
+    <tr><td>C3 Adapters</td><td>source paths</td><td>C4, C5, C6</td></tr>
+    <tr><td>C4 Validator</td><td>C3, column map</td><td>C5, C6</td></tr>
+    <tr><td>C5 Profiler</td><td>C3, C4, quality config</td><td>CLI, cache key</td></tr>
+    <tr><td>C6 Canonicalizer</td><td>C3, C4, C5, market clock, scope</td><td>C9, C10</td></tr>
+    <tr><td>C7 Lexicon store</td><td>config + artifacts lexicons</td><td>C9, C10, C14</td></tr>
+    <tr><td>C8 LLM gateway</td><td>.env, network, llm_cache</td><td>C9, C15, C17</td></tr>
+    <tr><td>C9 Induction</td><td>C8, C6, C7, C12</td><td>C14</td></tr>
+    <tr><td>C10 Panel &amp; cache</td><td>C6, C7, cache dir</td><td>C11, C13, C14</td></tr>
+    <tr><td>C11 Tool registry</td><td>C10, C12, settings</td><td>C13, C14, C15</td></tr>
+    <tr><td>C12 Inference kernel</td><td>numpy, scipy, bootstrap config</td><td>C11</td></tr>
+    <tr><td>C13 Playbook</td><td>C11</td><td>C14</td></tr>
+    <tr><td>C14 Coordinator</td><td>all of the above</td><td>C1</td></tr>
+    <tr><td>C15 Explorer</td><td>C8, C11, C14 budget</td><td>C14</td></tr>
+    <tr><td>C16 Findings &amp; checks</td><td>ToolResults, tiers, alpha</td><td>C14, C17</td></tr>
+    <tr><td>C17 Presenter</td><td>C8, C16</td><td>C14</td></tr>
+    <tr><td>C18 Reporting</td><td>RunState, ChartSpecs</td><td>C1</td></tr>
+    <tr><td>C19 Append</td><td>C6, C7, C10</td><td>C1</td></tr>
+  </tbody>
+</table>
+
+<h3>7.2 External dependencies</h3>
+<table>
+  <thead><tr><th style="width:20%">Package</th><th style="width:30%">Used for</th><th>If it is missing</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">pandas</td><td>All tabular work: cleaning, alignment, aggregation, panel.</td><td>required — run refuses</td></tr>
+    <tr><td class="mono">numpy</td><td>Vector maths, quantiles, bootstrap arrays.</td><td>required</td></tr>
+    <tr><td class="mono">scipy</td><td>Spearman, bootstrap and BH helpers.</td><td>required for statistics</td></tr>
+    <tr><td class="mono">pydantic</td><td>Schemas: tool params, ToolResult, Finding, Lexicon.</td><td>required</td></tr>
+    <tr><td class="mono">PyYAML</td><td>The two config files.</td><td>required</td></tr>
+    <tr><td class="mono">python-dotenv</td><td>Reading <code>.env</code> without overriding real env vars.</td><td>required (env still works)</td></tr>
+    <tr><td class="mono">rich</td><td>Terminal formatting; a plain fallback exists.</td><td>degrades to plain print</td></tr>
+    <tr><td class="mono">matplotlib</td><td>PNG chart rendering.</td><td>optional — ASCII charts remain</td></tr>
+    <tr><td class="mono">vaderSentiment</td><td>Second sentiment component.</td><td>optional — lexicon-only scoring</td></tr>
+    <tr><td class="mono">pytest</td><td>~120 tests on synthetic fixtures.</td><td>dev only</td></tr>
+    <tr><td class="mono">stdlib urllib</td><td><strong>All</strong> LLM transport.</td><td>no vendor SDK by design</td></tr>
+  </tbody>
+</table>
+<p class="small">Pinned versions live in <code>requirements.txt</code>. The rule behind this table: dependencies
+that touch data or statistics are required, dependencies that touch presentation or the model are optional, and a
+missing optional dependency degrades a feature rather than failing a run.</p>
+
+<!-- ===================== 8 ===================== -->
+<h2 id="s8"><span class="num">8</span>Invariants &amp; trust boundaries</h2>
+<p>The interesting part of this design is not what it computes — it is what it refuses to let a model do.</p>
+
+<table>
+  <thead><tr><th style="width:30%">Boundary</th><th>How it is enforced, not merely requested</th></tr></thead>
+  <tbody>
+    <tr><td><strong>The model never computes a number</strong></td><td>Its only write path is a tool call, and a tool returns a stored <code>ToolResult</code>. Prose numbers are re-verified against those results before publication.</td></tr>
+    <tr><td><strong>The model never sees the full dataset</strong></td><td>It receives a trimmed digest and, at most, a bounded stratified sample of text.</td></tr>
+    <tr><td><strong>The model cannot peek at the holdout</strong></td><td>The explorer's tool calls are constrained to the discovery period in code; the holdout is reachable only through a coordinator-triggered re-run.</td></tr>
+    <tr><td><strong>The model cannot decide "supported"</strong></td><td>Status is a pure function of q-value, confidence interval, holdout sign and coverage tier.</td></tr>
+    <tr><td><strong>A claim cannot outrun its evidence</strong></td><td>Every finding must cite a result id; the claim checker strips or flags any number that fails to match.</td></tr>
+    <tr><td><strong>Every result is attributable</strong></td><td><code>result_id</code> + <code>data_version</code> + manifest, written for each run.</td></tr>
+    <tr><td><strong>The cache cannot lie</strong></td><td>The fingerprint covers inputs, both config files, the lexicon id and the code version; a mismatch forces a rebuild.</td></tr>
+    <tr><td><strong>Inputs are never modified</strong></td><td>All reading is read-only; the ZIP is never extracted onto disk.</td></tr>
+  </tbody>
+</table>
+
+<!-- ===================== 9 ===================== -->
+<h2 id="s9"><span class="num">9</span>Failure modes &amp; degradation</h2>
+<table>
+  <thead><tr><th style="width:26%">Failure</th><th>Behaviour</th><th style="width:14%">Severity</th></tr></thead>
+  <tbody>
+    <tr><td>No API key / endpoint down</td><td>Model plane reports unavailable; playbook, verification, statuses and templated narrative all still run. A first-class mode, not an error path.</td><td>none</td></tr>
+    <tr><td>Induction gate rejects everything</td><td>The shipped lexicon is kept and the reason is recorded in the manifest.</td><td>degraded</td></tr>
+    <tr><td>A tool call is impossible on this slice (too few units)</td><td>Recorded as a skipped call with a reason; the report states it. No chart is produced.</td><td>degraded</td></tr>
+    <tr><td>Model returns malformed or truncated JSON</td><td>The gateway salvages the truncated object; a schema-retry is allowed once; otherwise the templated fallback is used.</td><td>degraded</td></tr>
+    <tr><td>Claim checker finds an unsourced number</td><td>The claim is stripped or flagged rather than published.</td><td>contained</td></tr>
+    <tr><td>Panel cache missing or mismatched</td><td>Rebuild from source; the cache is an optimisation, never a dependency.</td><td>slower</td></tr>
+    <tr><td>Console cannot encode Unicode</td><td>ASCII rendering ramp; the chart menu replaces instead of raising.</td><td>cosmetic</td></tr>
+    <tr><td>Missing column / unparseable date / no ticker overlap</td><td>Blocking check: the run is refused with the file and column named.</td><td>fatal (intended)</td></tr>
+    <tr><td>Suspected unadjusted split</td><td>Blocking check on every run — a silent split would corrupt every return.</td><td>fatal (intended)</td></tr>
+  </tbody>
+</table>
+
+<!-- ===================== 10 ===================== -->
+<h2 id="s10"><span class="num">10</span>Configuration surface</h2>
+<p>Everything an analyst plausibly wants to change lives in two files. No component hard-codes a window,
+threshold or path.</p>
+<table>
+  <thead><tr><th style="width:34%">Knob</th><th style="width:20%">File</th><th>Effect</th></tr></thead>
+  <tbody>
+    <tr><td><code>datasets.active</code> / <code>--dataset</code></td><td class="mono">settings.yaml</td><td>Selects dev (fast, correctness only) or full (the real corpus); CLI flag wins for one run.</td></tr>
+    <tr><td><code>datasets.sources.&lt;name&gt;</code></td><td class="mono">settings.yaml</td><td>Point at a completely different dataset — paths plus the ZIP member name.</td></tr>
+    <tr><td><code>columns.*</code></td><td class="mono">settings.yaml</td><td>Map differently named CSV headers without touching code.</td></tr>
+    <tr><td><code>market.timezone / close_hour</code></td><td class="mono">settings.yaml</td><td>Session boundary rule for tweet alignment.</td></tr>
+    <tr><td><code>llm.*</code> + <code>.env</code></td><td class="mono">settings.yaml</td><td>Endpoint, model, transport mode, temperature, response cache.</td></tr>
+    <tr><td><code>scope.include / exclude</code></td><td class="mono">experiments.yaml</td><td>Ticker filter applied before any metric, in every stage.</td></tr>
+    <tr><td><code>quality.*</code></td><td class="mono">experiments.yaml</td><td>Minimum tweets per day, promo shape, split-return limit, drift threshold.</td></tr>
+    <tr><td><code>tiers.*</code></td><td class="mono">experiments.yaml</td><td>Own-text-share cuts that define coverage tiers A/B/C.</td></tr>
+    <tr><td><code>split.discovery_fraction</code></td><td class="mono">experiments.yaml</td><td>Chronological 70/30 cut, expressed as a session fraction.</td></tr>
+    <tr><td><code>attention.* / price.*</code></td><td class="mono">experiments.yaml</td><td>Baseline window, spike threshold, volatility windows, forward horizons.</td></tr>
+    <tr><td><code>bootstrap.* / multiple_testing.*</code></td><td class="mono">experiments.yaml</td><td>Block length, resamples, seed, alpha, correction method.</td></tr>
+    <tr><td><code>agents.*</code></td><td class="mono">settings.yaml</td><td>Budgets: induction size, explorer tool calls, presenter finding cap.</td></tr>
+  </tbody>
+</table>
+
+<!-- ===================== 11 ===================== -->
+<h2 id="s11"><span class="num">11</span>Extension points</h2>
+<table>
+  <thead><tr><th style="width:32%">To do this</th><th>Touch exactly this</th></tr></thead>
+  <tbody>
+    <tr><td>Add a new analysis</td><td>Write a function with a pydantic params class in the appropriate tool module and register it; the agent can now call it, and the playbook gains one list entry.</td></tr>
+    <tr><td>Add a new dataset</td><td>One entry under <code>datasets.sources</code>, plus a column map if the headers differ.</td></tr>
+    <tr><td>Change the vocabulary</td><td>Re-run <code>induce</code>; the gate decides what is frozen. Or ship a new default lexicon and point <code>sentiment.lexicon</code> at it.</td></tr>
+    <tr><td>Tighten the statistics</td><td><code>experiments.yaml</code> only — block size, resamples, alpha.</td></tr>
+    <tr><td>Add a model provider</td><td>Nothing, if it speaks OpenAI-compatible HTTP. Otherwise the gateway is a single class.</td></tr>
+    <tr><td>Change what a run outputs</td><td>The reporting layer — it is a pure view over <code>RunState</code>.</td></tr>
+  </tbody>
+</table>
+
+<!-- ===================== 12 ===================== -->
+<h2 id="s12"><span class="num">12</span>Known limits</h2>
+<ul>
+  <li><strong>One regime.</strong> A single year that includes the 2022 drawdown. Nothing generalises past that window.</li>
+  <li><strong>The unit is the ticker-day, not the tweet.</strong> Overlapping forward returns are handled with session-block resampling, but the effective sample stays small.</li>
+  <li><strong>Cross-posted text is structural.</strong> Tier C tickers can never yield more than an <code>observed</code> finding, by rule.</li>
+  <li><strong>Sentiment is scored by general-purpose tools</strong> (a lexicon blended with VADER) that are weak on finance slang and sarcasm.</li>
+  <li><strong>Agent choices are not reproducible</strong>, even at temperature 0. The deterministic layer is; the questions an agent asks may differ between runs.</li>
+  <li><strong>The holdout is 30% of one regime</strong>, so replication is weak evidence, and the report's wording says so.</li>
+  <li><strong>Single-machine, batch, in-memory.</strong> The design optimises for auditability, not throughput.</li>
+</ul>
+
+<div class="box accent">
+  <span class="tag">The one-sentence summary</span>
+  <p style="margin-bottom:0">A deterministic analysis engine with a cache-keyed data plane and a strict
+  evidence contract, wrapped by an optional model plane whose only powers are choosing questions and writing
+  prose — both of which are checked by code before a reader ever sees them.</p>
+</div>
+
+<footer>
+  Generated as a high-level, as-built architecture review of the Agentic EDA Demo.
+  Companion documents: <code>SPEC.md</code> (design), <code>docs/PROGRESS.md</code> (state),
+  <code>docs/adr/</code> (decision records), <code>README.md</code> (usage).
+</footer>
+
+</main>
+</div>
+</div>
+</body>
+</html>
